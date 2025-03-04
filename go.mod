@@ -1,6 +1,8 @@
 module github.com/open4go/p7
 
-go 1.24.0
+go 1.23.0
+
+toolchain go1.24.0
 
 require (
 	github.com/open4go/db v0.0.11
