@@ -225,7 +225,7 @@ func (d *ChartData) Stats(ctx context.Context, days int) ([]ChartItem, error) {
 				continue
 			} else {
 				countInt, _ := strconv.Atoi(count)
-				t2v[key] = countInt
+				t2v[t] = countInt
 			}
 		}
 
