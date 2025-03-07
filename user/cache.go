@@ -219,6 +219,7 @@ func (d *ChartData) Stats(ctx context.Context, days int) ([]ChartItem, error) {
 		t2v := make(map[string]int)
 		for _, t := range d.Head {
 			key := d.GetKey(t)
+			fmt.Println("head key", key, date)
 			count, err := GetRedisCacheHandler(ctx).HGet(ctx, key, date).Result()
 			if err != nil {
 				continue
