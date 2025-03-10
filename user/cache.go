@@ -20,7 +20,8 @@ type DaysData struct {
 
 // ChartItem 暂时够用了
 type ChartItem struct {
-	Date string
+	// x name can be date or something...
+	Name string
 	A    int
 	B    int
 	C    int
@@ -33,7 +34,7 @@ type ChartItem struct {
 func Map2ChartItem(dataMap map[string]int, day string) ChartItem {
 	// 创建 ChartItem 实例
 	item := ChartItem{
-		Date: day, // 示例日期
+		Name: day, // 示例日期
 	}
 	// 将 map 的值赋给 ChartItem
 	for key, value := range dataMap {
@@ -60,9 +61,7 @@ func Map2ChartItem(dataMap map[string]int, day string) ChartItem {
 }
 
 const (
-	dailyNewUser = "data:daily:new:users"
-	onlineUser   = "data:online:users"
-	basePrefix   = "data:chart"
+	basePrefix = "data:chart"
 )
 
 // DataSourceType 定义数据源类型
@@ -235,64 +234,68 @@ func (d *ChartData) Stats(ctx context.Context, days int) ([]ChartItem, error) {
 	return daysData, nil
 }
 
-// Register 用户注册
-func Register(ctx context.Context, key string) error {
-	today := time.Now().Format("2006-01-02")
-	err := GetRedisCacheHandler(ctx).HIncrBy(ctx, dailyNewUser, today, 1).Err()
+func (d *ChartData) CurrentMonthly(ctx context.Context) ([]ChartItem, error) {
+	daysData := make([]ChartItem, 0)
+
+	// 遍历从本月的第一天到今天的每一天
+	days, err := CurrentMonthlyDays(ctx)
 	if err != nil {
-		return err
+		return daysData, err
 	}
-
-	// 设置过期时间为 7 天
-	GetRedisCacheHandler(ctx).Expire(ctx, dailyNewUser, 7*24*time.Hour)
-
-	// 删除一个月前的数据
-	oneMonthAgo := time.Now().AddDate(0, -1, 0).Format("2006-01-02")
-	GetRedisCacheHandler(ctx).HDel(ctx, dailyNewUser, oneMonthAgo)
-
-	// 其他用户注册逻辑
-	return nil
-}
-
-// GetStats 获取最近指定天数的用户统计
-func GetStats(ctx context.Context, days int) (map[string]int, []DaysData, error) {
-	today := time.Now()
-	stats := make(map[string]int)
-	daysData := make([]DaysData, 0)
-
-	for i := 0; i < days; i++ {
-		date := today.AddDate(0, 0, -i).Format("2006-01-02")
-		count, err := GetRedisCacheHandler(ctx).HGet(ctx, dailyNewUser, date).Result()
-		if err != nil {
-			stats[date] = 0
-			daysData = append(daysData, DaysData{
-				Date:    date,
-				Counter: 0,
-			})
-		} else {
+	for _, dateStr := range days {
+		// 每次重新初始化，避免数据污染
+		t2v := make(map[string]int)
+		for _, t := range d.Head {
+			key := d.GetKey(t)
+			fmt.Println("head key", key, dateStr)
+			count, err := GetRedisCacheHandler(ctx).HGet(ctx, key, dateStr).Result()
+			if err != nil {
+				continue
+			}
 			countInt, _ := strconv.Atoi(count)
-			stats[date] = countInt
-			daysData = append(daysData, DaysData{
-				Date:    date,
-				Counter: countInt,
-			})
+			t2v[t] = countInt
 		}
+
+		item := Map2ChartItem(t2v, dateStr)
+		daysData = append(daysData, item)
+	}
+	return daysData, nil
+}
+
+func (d *ChartData) CurrentMonthlySummary(ctx context.Context) (map[string]int, error) {
+	// 遍历从本月的第一天到今天的每一天
+	data, err := d.CurrentMonthly(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	return stats, daysData, nil
+	// 将一个月的所有同一纬度的数据累加
+	m := make(map[string]int)
+	for _, i := range data {
+		m["a"] = m["a"] + i.A
+		m["b"] = m["b"] + i.B
+		m["c"] = m["c"] + i.C
+		m["d"] = m["d"] + i.D
+		m["e"] = m["e"] + i.E
+		m["f"] = m["f"] + i.F
+		m["g"] = m["g"] + i.G
+	}
+
+	// 返回即可
+	// 可以通过快速读取map值获得数据
+	return m, nil
 }
 
-// GetOnlineCount 获取当前在线人数
-func GetOnlineCount(ctx context.Context) (int64, error) {
-	return GetRedisCacheHandler(ctx).SCard(ctx, onlineUser).Result()
-}
+func CurrentMonthlyDays(ctx context.Context) ([]string, error) {
+	today := time.Now()
+	startOfMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+	days := make([]string, 0)
 
-// Login 用户登录
-func Login(ctx context.Context, userID string) error {
-	return GetRedisCacheHandler(ctx).SAdd(ctx, onlineUser, userID).Err()
-}
-
-// Logout 用户登出
-func Logout(ctx context.Context, userID string) error {
-	return GetRedisCacheHandler(ctx).SRem(ctx, onlineUser, userID).Err()
+	// 遍历从本月的第一天到今天的每一天
+	for date := startOfMonth; date.Before(today) || date.Equal(today); date = date.AddDate(0, 0, 1) {
+		dateStr := date.Format("2006-01-02")
+		days = append(days, dateStr)
+		fmt.Println("dateStr key", dateStr)
+	}
+	return days, nil
 }
