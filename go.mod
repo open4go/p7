@@ -7,6 +7,7 @@ toolchain go1.24.0
 require (
 	github.com/open4go/db v0.0.11
 	github.com/open4go/log v0.0.16
+	github.com/open4go/req5rsp v0.1.47
 	github.com/redis/go-redis/v9 v9.7.1
 )
 
@@ -46,7 +47,6 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/open4go/req5rsp v0.1.46 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
