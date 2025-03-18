@@ -62,3 +62,71 @@ func Send(ctx context.Context, queueName string, msg string) error {
 	log.Printf(" [x] Sent %s\n", msg)
 	return nil
 }
+
+
+
+// MessageHandler 定义一个处理函数类型
+type MessageHandler func(string)
+
+func Receive(ctx context.Context, handler MessageHandler) {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	failOnError(err, "Failed to connect to RabbitMQ")
+	defer func(conn *amqp.Connection) {
+		err := conn.Close()
+		if err != nil {
+			failOnError(err, "Failed to close connection")
+		}
+	}(conn)
+
+	ch, err := conn.Channel()
+	failOnError(err, "Failed to open a channel")
+	defer func(ch *amqp.Channel) {
+		err := ch.Close()
+		if err != nil {
+			failOnError(err, "Failed to close channel")
+		}
+	}(ch)
+
+	q, err := ch.QueueDeclare(
+		"hello", // name
+		false,   // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
+	)
+	failOnError(err, "Failed to declare a queue")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	msgs, err := ch.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	failOnError(err, "Failed to register a consumer")
+
+	var forever chan struct{}
+
+	go func() {
+		for d := range msgs {
+			log.Printf("Received a message: %s", d.Body)
+			// 调用处理函数
+			handler(string(d.Body))
+		}
+	}()
+
+	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	<-forever
+}
+
+func Process(msg string) {
+	// 在这里处理接收到的消息
+	log.Printf("Processing message: %s", msg)
+}
+
