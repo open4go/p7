@@ -1,10 +1,11 @@
-package p7
+package mq
 
 import (
 	"context"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/spf13/viper"
 	"log"
+	"time"
 )
 
 func failOnError(err error, msg string) {
@@ -62,8 +63,6 @@ func Send(ctx context.Context, queueName string, msg string) error {
 	log.Printf(" [x] Sent %s\n", msg)
 	return nil
 }
-
-
 
 // MessageHandler 定义一个处理函数类型
 type MessageHandler func(string)
@@ -129,4 +128,3 @@ func Process(msg string) {
 	// 在这里处理接收到的消息
 	log.Printf("Processing message: %s", msg)
 }
-
