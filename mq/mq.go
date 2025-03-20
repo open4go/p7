@@ -67,7 +67,7 @@ func Send(ctx context.Context, queueName string, msg string) error {
 // MessageHandler 定义一个处理函数类型
 type MessageHandler func(string)
 
-func Receive(ctx context.Context, handler MessageHandler) {
+func Receive(ctx context.Context, queueName string, handler MessageHandler) {
 	amqpUrl := viper.GetString("amqp.url")
 	conn, err := amqp.Dial(amqpUrl)
 	failOnError(err, "Failed to connect to RabbitMQ")
@@ -88,12 +88,12 @@ func Receive(ctx context.Context, handler MessageHandler) {
 	}(ch)
 
 	q, err := ch.QueueDeclare(
-		"hello", // name
-		false,   // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		queueName, // name
+		false,     // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
 
