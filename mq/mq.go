@@ -68,7 +68,8 @@ func Send(ctx context.Context, queueName string, msg string) error {
 type MessageHandler func(string)
 
 func Receive(ctx context.Context, handler MessageHandler) {
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	amqpUrl := viper.GetString("amqp.url")
+	conn, err := amqp.Dial(amqpUrl)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer func(conn *amqp.Connection) {
 		err := conn.Close()
