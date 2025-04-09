@@ -11,6 +11,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.7.1
 	github.com/spf13/viper v1.12.0
+	go.mongodb.org/mongo-driver v1.15.0
 )
 
 require (

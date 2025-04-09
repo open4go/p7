@@ -1,4 +1,4 @@
-package attendance
+package atten
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func CheckIn(ctx context.Context, userId string) error {
 	if err != nil {
 		return errors.New("设置过期时间失败")
 	}
-	
+
 	// 签到成功
 	return nil
 }
