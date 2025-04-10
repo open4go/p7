@@ -72,3 +72,34 @@ func CheckStatus(ctx context.Context, userID string) ([]int, error) {
 	// 查询状态
 	return status, nil
 }
+
+type AttendanceStatus struct {
+	Bits    []int
+	Counter int64
+}
+
+// CheckStatusDetail 查询签到状态
+// ym: 2025:04
+func CheckStatusDetail(ctx context.Context, ym string, userID string) (AttendanceStatus, error) {
+
+	a := AttendanceStatus{}
+
+	key := fmt.Sprintf("attendance:%s:%s", userID, ym)
+	// 查询本月签到状态
+	status := make([]int, 31)
+	for day := 1; day <= 31; day++ {
+		bit, err := GetRedisCacheHandler(ctx).GetBit(ctx, key, int64(day-1)).Result()
+		if err != nil {
+			return a, errors.New("查询失败")
+		}
+		status[day-1] = int(bit)
+	}
+
+	a.Bits = status
+
+	// 统计签到次数
+	count, _ := GetRedisCacheHandler(ctx).BitCount(ctx, key, nil).Result()
+	a.Counter = count
+	// 查询状态
+	return a, nil
+}
