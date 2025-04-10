@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/open4go/r3time"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ type Attendance struct {
 
 // CheckIn 签到
 func CheckIn(ctx context.Context, userId string) error {
-	now := time.Now()
+	now := r3time.LocTime()
 	year := now.Year()
 	month := now.Month()
 	day := now.Day()
@@ -55,7 +56,7 @@ func CheckIn(ctx context.Context, userId string) error {
 
 // CheckStatus 查询签到状态
 func CheckStatus(ctx context.Context, userID string) ([]int, error) {
-	now := time.Now()
+	now := r3time.LocTime()
 	year := now.Year()
 	month := now.Month()
 
@@ -110,7 +111,7 @@ func CheckStatusDetail(ctx context.Context, ym string, userID string) (Attendanc
 	if len(parts) != 2 {
 		return a, errors.New("日期格式错误，应为 year:month")
 	}
-	now := time.Now()
+	now := r3time.LocTime()
 	currentYear, currentMonth, currentDay := now.Date()
 	inputYear, _ := strconv.Atoi(parts[0])
 	inputMonth, _ := strconv.Atoi(parts[1])

@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/open4go/db v0.0.11
 	github.com/open4go/log v0.0.16
+	github.com/open4go/r3time v0.0.7
 	github.com/open4go/req5rsp v0.1.47
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.7.1
