@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -74,8 +76,9 @@ func CheckStatus(ctx context.Context, userID string) ([]int, error) {
 }
 
 type AttendanceStatus struct {
-	Bits    []int
-	Counter int64
+	Bits         []int
+	Counter      int64
+	IsCheckToday bool // 当天是否已签到（新增字段）
 }
 
 // CheckStatusDetail 查询签到状态
@@ -100,6 +103,24 @@ func CheckStatusDetail(ctx context.Context, ym string, userID string) (Attendanc
 	// 统计签到次数
 	count, _ := GetRedisCacheHandler(ctx).BitCount(ctx, key, nil).Result()
 	a.Counter = count
+
+	// 5. 检查当天是否签到（新增）
+	// 1. 验证日期格式
+	parts := strings.Split(ym, ":")
+	if len(parts) != 2 {
+		return a, errors.New("日期格式错误，应为 year:month")
+	}
+	now := time.Now()
+	currentYear, currentMonth, currentDay := now.Date()
+	inputYear, _ := strconv.Atoi(parts[0])
+	inputMonth, _ := strconv.Atoi(parts[1])
+
+	// 只有当查询的是当前年月时才检查当天
+	if inputYear == currentYear && inputMonth == int(currentMonth) {
+		a.IsCheckToday = a.Bits[currentDay-1] == 1
+	} else {
+		a.IsCheckToday = false
+	}
 	// 查询状态
 	return a, nil
 }
