@@ -1,4 +1,4 @@
-package queuing
+package oqueue
 
 import (
 	"context"
