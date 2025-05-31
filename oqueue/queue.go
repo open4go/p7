@@ -3,8 +3,10 @@ package oqueue
 import (
 	"context"
 	"fmt"
+	"github.com/open4go/log"
 	"github.com/redis/go-redis/v9"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -65,7 +67,12 @@ func (q *QueueSystem) EnqueueOrder(ctx context.Context, order OrderInfo) error {
 		order.EnqueueTime = time.Now()
 	}
 
-	value := fmt.Sprintf("%s:%s:%d:%d", order.MerchantID, order.OrderID, order.NumOfItems, order.EnqueueTime.Unix())
+	// Create a value that can be reliably parsed
+	value := fmt.Sprintf("%s:%s:%d:%d",
+		order.MerchantID,
+		order.OrderID,
+		order.NumOfItems,
+		order.EnqueueTime.Unix())
 
 	// 修正后的ZAdd调用方式
 	z := redis.Z{
@@ -98,6 +105,7 @@ func (q *QueueSystem) GetOrderPosition(ctx context.Context, orderID string) (pos
 	for i, order := range orders {
 		orderInfo, err := parseOrderInfo(order.Member.(string))
 		if err != nil {
+			log.Log(ctx).Printf("Failed to parse order %v: %v", order, err)
 			continue
 		}
 
@@ -225,13 +233,25 @@ func (q *QueueSystem) updateMerchantStats(ctx context.Context, merchantID string
 
 // parseOrderInfo 解析订单信息(增强版)
 func parseOrderInfo(s string) (*OrderInfo, error) {
-	var merchantID, orderID string
-	var numOfItems int
-	var enqueueTimeUnix int64
-
-	n, err := fmt.Sscanf(s, "%s:%s:%d:%d", &merchantID, &orderID, &numOfItems, &enqueueTimeUnix)
-	if err != nil || n != 4 {
+	parts := strings.Split(s, ":")
+	if len(parts) < 4 {
 		return nil, fmt.Errorf("invalid order info format")
+	}
+
+	// The merchant ID might contain colons, so we need to handle that
+	// The last 3 parts are orderID, numOfItems, enqueueTime
+	// Everything before that is merchantID
+	merchantID := strings.Join(parts[:len(parts)-3], ":")
+	orderID := parts[len(parts)-3]
+
+	numOfItems, err := strconv.Atoi(parts[len(parts)-2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid numOfItems: %v", err)
+	}
+
+	enqueueTimeUnix, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid timestamp: %v", err)
 	}
 
 	return &OrderInfo{
