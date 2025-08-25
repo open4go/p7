@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/open4go/log"
 	"strconv"
 	"time"
 )
@@ -218,7 +219,7 @@ func (d *ChartData) Stats(ctx context.Context, days int) ([]ChartItem, error) {
 		t2v := make(map[string]int)
 		for _, t := range d.Head {
 			key := d.GetKey(t)
-			fmt.Println("head key", key, date)
+			log.Log(ctx).WithField("key", key).WithField("date", date).Debug("inside Stats loop")
 			count, err := GetRedisCacheHandler(ctx).HGet(ctx, key, date).Result()
 			if err != nil {
 				continue
@@ -247,7 +248,7 @@ func (d *ChartData) CurrentMonthly(ctx context.Context) ([]ChartItem, error) {
 		t2v := make(map[string]int)
 		for _, t := range d.Head {
 			key := d.GetKey(t)
-			fmt.Println("head key", key, dateStr)
+			log.Log(ctx).WithField("key", key).WithField("date", dateStr).Debug("inside Stats loop")
 			count, err := GetRedisCacheHandler(ctx).HGet(ctx, key, dateStr).Result()
 			if err != nil {
 				continue
