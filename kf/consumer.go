@@ -42,8 +42,7 @@ func ReadMessage(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Log(ctx).
-		Printf("[Kafka] Consumed message: %s", string(msg.Value))
+	log.Log(ctx).WithField("payload", msg.Value).Debug("[Kafka] Consumed message")
 	return msg.Value, nil
 }
 
@@ -60,7 +59,7 @@ func ConsumeLoop(ctx context.Context, handler func([]byte)) {
 		for {
 			msg, err := reader.ReadMessage(ctx)
 			if err != nil {
-				log.Log(ctx).Error("[Kafka] Error reading message: %v", err)
+				log.Log(ctx).Error(err)
 				continue
 			}
 			handler(msg.Value)
