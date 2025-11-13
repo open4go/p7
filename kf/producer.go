@@ -1,62 +1,106 @@
 package kf
 
 import (
+	"context"
 	"fmt"
 	"github.com/open4go/log"
 	"github.com/segmentio/kafka-go"
-	"golang.org/x/net/context"
 	"sync"
 	"time"
 )
 
-// 全局 writer 单例
+// WriterManager 管理多个 topic 对应的 Kafka Writer
+type WriterManager struct {
+	writers map[string]*kafka.Writer
+	lock    sync.RWMutex
+	brokers []string
+}
+
+// 全局实例
 var (
-	writer *kafka.Writer
-	once   sync.Once
+	manager     *WriterManager
+	managerOnce sync.Once
 )
 
-// InitWriter 初始化全局 Kafka Writer
-func InitWriter(ctx context.Context, brokers []string, topic string) {
-	once.Do(func() {
-		writer = &kafka.Writer{
-			Addr:         kafka.TCP(brokers...),
-			Topic:        topic,
-			Balancer:     &kafka.LeastBytes{},
-			RequiredAcks: kafka.RequireAll,
-			Async:        false,
-			BatchTimeout: 10 * time.Millisecond,
+// InitWriterManager 初始化 Writer 管理器
+func InitWriterManager(ctx context.Context, brokers []string) {
+	managerOnce.Do(func() {
+		manager = &WriterManager{
+			writers: make(map[string]*kafka.Writer),
+			brokers: brokers,
 		}
-		log.Log(ctx).WithField("topic", topic).
-			Info("[Kafka] Writer initialized for topic")
+		log.Log(ctx).WithField("brokers", brokers).
+			Info("[Kafka] WriterManager initialized")
 	})
 }
 
-// Close 关闭 writer
-func Close() error {
-	if writer != nil {
-		return writer.Close()
+// getWriter 获取或创建指定 topic 的 writer
+func (m *WriterManager) getWriter(ctx context.Context, topic string) *kafka.Writer {
+	m.lock.RLock()
+	w, ok := m.writers[topic]
+	m.lock.RUnlock()
+	if ok {
+		return w
 	}
-	return nil
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	// 双重检查
+	if w, ok = m.writers[topic]; ok {
+		return w
+	}
+
+	w = &kafka.Writer{
+		Addr:         kafka.TCP(m.brokers...),
+		Topic:        topic,
+		Balancer:     &kafka.LeastBytes{},
+		RequiredAcks: kafka.RequireAll,
+		Async:        false,
+		BatchTimeout: 10 * time.Millisecond,
+	}
+	m.writers[topic] = w
+
+	log.Log(ctx).WithField("topic", topic).
+		Info("[Kafka] Writer created for topic")
+
+	return w
 }
 
-// SendString 发送字符串消息
-func SendString(ctx context.Context, message string) error {
-	if writer == nil {
-		return fmt.Errorf("kafka writer not initialized")
+// SendString 向指定 topic 发送字符串消息
+func SendString(ctx context.Context, topic, message string) error {
+	if manager == nil {
+		return fmt.Errorf("Kafka WriterManager not initialized")
 	}
 
-	return writer.WriteMessages(ctx, kafka.Message{
+	w := manager.getWriter(ctx, topic)
+	return w.WriteMessages(ctx, kafka.Message{
 		Value: []byte(message),
 	})
 }
 
-// SendBytes 发送二进制消息
-func SendBytes(ctx context.Context, data []byte) error {
-	if writer == nil {
-		return fmt.Errorf("kafka writer not initialized")
+// SendBytes 向指定 topic 发送二进制消息
+func SendBytes(ctx context.Context, topic string, data []byte) error {
+	if manager == nil {
+		return fmt.Errorf("Kafka WriterManager not initialized")
 	}
 
-	return writer.WriteMessages(ctx, kafka.Message{
+	w := manager.getWriter(ctx, topic)
+	return w.WriteMessages(ctx, kafka.Message{
 		Value: data,
 	})
+}
+
+// CloseAll 关闭所有 writer
+func CloseAll() {
+	if manager == nil {
+		return
+	}
+
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+
+	for topic, w := range manager.writers {
+		_ = w.Close()
+		delete(manager.writers, topic)
+	}
 }
