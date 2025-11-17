@@ -9,6 +9,8 @@ const (
 	OrderCreated = "order-created"
 	// OrderCancel 订单取消
 	OrderCancel = "order-cancel"
+	// OrderPaying 订单支付中（未收到回调或者返回，这类订单需要主动查询订单）
+	OrderPaying = "order-paying"
 	// OrderPaySuccess 订单支付成功
 	OrderPaySuccess = "order-pay-success"
 	// OrderPayFailed 订单支付失败
