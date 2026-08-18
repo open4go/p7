@@ -54,6 +54,14 @@ func CheckIn(ctx context.Context, userId string) error {
 	return nil
 }
 
+// UndoCheckIn clears today's check-in bit (compensation when grant fails).
+func UndoCheckIn(ctx context.Context, userId string) error {
+	now := r3time.LocTime()
+	key := fmt.Sprintf("attendance:%s:%d:%d", userId, now.Year(), now.Month())
+	_, err := GetRedisCacheHandler(ctx).SetBit(ctx, key, int64(now.Day()-1), 0).Result()
+	return err
+}
+
 // CheckStatus 查询签到状态
 func CheckStatus(ctx context.Context, userID string) ([]int, error) {
 	now := r3time.LocTime()
