@@ -5,7 +5,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/spf13/viper"
 	"log"
-	"time"
 )
 
 func failOnError(err error, msg string) {
@@ -96,9 +95,6 @@ func Receive(ctx context.Context, queueName string, handler MessageHandler) {
 		nil,       // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	msgs, err := ch.Consume(
 		q.Name, // queue

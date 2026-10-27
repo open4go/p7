@@ -69,7 +69,7 @@ func (m *WriterManager) getWriter(ctx context.Context, topic string) *kafka.Writ
 // SendString 向指定 topic 发送字符串消息
 func SendString(ctx context.Context, topic, message string) error {
 	if manager == nil {
-		return fmt.Errorf("Kafka WriterManager not initialized")
+		return fmt.Errorf("kafka WriterManager not initialized")
 	}
 
 	w := manager.getWriter(ctx, topic)
@@ -81,7 +81,7 @@ func SendString(ctx context.Context, topic, message string) error {
 // SendBytes 向指定 topic 发送二进制消息
 func SendBytes(ctx context.Context, topic string, data []byte) error {
 	if manager == nil {
-		return fmt.Errorf("Kafka WriterManager not initialized")
+		return fmt.Errorf("kafka WriterManager not initialized")
 	}
 
 	w := manager.getWriter(ctx, topic)
