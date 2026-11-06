@@ -2,42 +2,43 @@ package mq
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/spf13/viper"
-	"log"
 )
 
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Panicf("%s: %s", msg, err)
+// ErrAMQPNotConfigured is returned when amqp.url is empty.
+var ErrAMQPNotConfigured = errors.New("amqp.url not configured")
+
+func amqpURL() (string, error) {
+	url := viper.GetString("amqp.url")
+	if url == "" {
+		return "", ErrAMQPNotConfigured
 	}
+	return url, nil
 }
 
-// Send 将数据丢到队列中
-//
-//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-//	defer cancel()
-//
-// "amqp://guest:guest@localhost:5672/"
+// Send publishes msg to queueName. Connection / channel / publish failures
+// return an error; they never panic (S-08 / order-task stability).
 func Send(ctx context.Context, queueName string, msg string) error {
-	amqpUrl := viper.GetString("amqp.url")
+	amqpUrl, err := amqpURL()
+	if err != nil {
+		return err
+	}
 	conn, err := amqp.Dial(amqpUrl)
-	failOnError(err, "Failed to connect to RabbitMQ")
-	defer func(conn *amqp.Connection) {
-		err := conn.Close()
-		if err != nil {
-			failOnError(err, "Failed to declare a queue")
-		}
-	}(conn)
+	if err != nil {
+		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	defer func(ch *amqp.Channel) {
-		err := ch.Close()
-		if err != nil {
-			failOnError(err, "Failed to declare a queue")
-		}
-	}(ch)
+	if err != nil {
+		return fmt.Errorf("failed to open a channel: %w", err)
+	}
+	defer func() { _ = ch.Close() }()
 
 	q, err := ch.QueueDeclare(
 		queueName, // name
@@ -47,9 +48,11 @@ func Send(ctx context.Context, queueName string, msg string) error {
 		false,     // no-wait
 		nil,       // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
+	if err != nil {
+		return fmt.Errorf("failed to declare a queue: %w", err)
+	}
 
-	err = ch.PublishWithContext(ctx,
+	if err = ch.PublishWithContext(ctx,
 		"",     // exchange
 		q.Name, // routing key
 		false,  // mandatory
@@ -57,71 +60,77 @@ func Send(ctx context.Context, queueName string, msg string) error {
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(msg),
-		})
-	failOnError(err, "Failed to publish a message")
+		}); err != nil {
+		return fmt.Errorf("failed to publish a message: %w", err)
+	}
 	log.Printf(" [x] Sent %s\n", msg)
 	return nil
 }
 
-// MessageHandler 定义一个处理函数类型
+// MessageHandler is the consumer callback.
 type MessageHandler func(string)
 
-func Receive(ctx context.Context, queueName string, handler MessageHandler) {
-	amqpUrl := viper.GetString("amqp.url")
+// Receive consumes queueName forever. Dial / channel failures return an error
+// instead of panicking so the caller (e.g. device-api) can stay up.
+func Receive(ctx context.Context, queueName string, handler MessageHandler) error {
+	amqpUrl, err := amqpURL()
+	if err != nil {
+		return err
+	}
 	conn, err := amqp.Dial(amqpUrl)
-	failOnError(err, "Failed to connect to RabbitMQ")
-	defer func(conn *amqp.Connection) {
-		err := conn.Close()
-		if err != nil {
-			failOnError(err, "Failed to close connection")
-		}
-	}(conn)
+	if err != nil {
+		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	defer func(ch *amqp.Channel) {
-		err := ch.Close()
-		if err != nil {
-			failOnError(err, "Failed to close channel")
-		}
-	}(ch)
+	if err != nil {
+		return fmt.Errorf("failed to open a channel: %w", err)
+	}
+	defer func() { _ = ch.Close() }()
 
 	q, err := ch.QueueDeclare(
-		queueName, // name
-		false,     // durable
-		false,     // delete when unused
-		false,     // exclusive
-		false,     // no-wait
-		nil,       // arguments
+		queueName,
+		false,
+		false,
+		false,
+		false,
+		nil,
 	)
-	failOnError(err, "Failed to declare a queue")
+	if err != nil {
+		return fmt.Errorf("failed to declare a queue: %w", err)
+	}
 
 	msgs, err := ch.Consume(
-		q.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
+		q.Name,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
-	failOnError(err, "Failed to register a consumer")
+	if err != nil {
+		return fmt.Errorf("failed to register a consumer: %w", err)
+	}
 
-	var forever chan struct{}
-
-	go func() {
-		for d := range msgs {
-			log.Printf("Received a message: %s", d.Body)
-			// 调用处理函数
-			handler(string(d.Body))
+	log.Printf(" [*] Waiting for messages on %s", queueName)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case d, ok := <-msgs:
+			if !ok {
+				return errors.New("amqp consumer channel closed")
+			}
+			if handler != nil {
+				handler(string(d.Body))
+			}
 		}
-	}()
-
-	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
-	<-forever
+	}
 }
 
+// Process is a no-op sample handler kept for API compatibility.
 func Process(msg string) {
-	// 在这里处理接收到的消息
 	log.Printf("Processing message: %s", msg)
 }
