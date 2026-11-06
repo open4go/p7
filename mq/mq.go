@@ -30,13 +30,13 @@ func Send(ctx context.Context, queueName string, msg string) error {
 	}
 	conn, err := amqp.Dial(amqpUrl)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to RabbitMQ: %w", err)
+		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return fmt.Errorf("Failed to open a channel: %w", err)
+		return fmt.Errorf("failed to open a channel: %w", err)
 	}
 	defer func() { _ = ch.Close() }()
 
@@ -49,7 +49,7 @@ func Send(ctx context.Context, queueName string, msg string) error {
 		nil,       // arguments
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to declare a queue: %w", err)
+		return fmt.Errorf("failed to declare a queue: %w", err)
 	}
 
 	if err = ch.PublishWithContext(ctx,
@@ -61,7 +61,7 @@ func Send(ctx context.Context, queueName string, msg string) error {
 			ContentType: "text/plain",
 			Body:        []byte(msg),
 		}); err != nil {
-		return fmt.Errorf("Failed to publish a message: %w", err)
+		return fmt.Errorf("failed to publish a message: %w", err)
 	}
 	log.Printf(" [x] Sent %s\n", msg)
 	return nil
@@ -79,13 +79,13 @@ func Receive(ctx context.Context, queueName string, handler MessageHandler) erro
 	}
 	conn, err := amqp.Dial(amqpUrl)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to RabbitMQ: %w", err)
+		return fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		return fmt.Errorf("Failed to open a channel: %w", err)
+		return fmt.Errorf("failed to open a channel: %w", err)
 	}
 	defer func() { _ = ch.Close() }()
 
@@ -98,7 +98,7 @@ func Receive(ctx context.Context, queueName string, handler MessageHandler) erro
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to declare a queue: %w", err)
+		return fmt.Errorf("failed to declare a queue: %w", err)
 	}
 
 	msgs, err := ch.Consume(
@@ -111,7 +111,7 @@ func Receive(ctx context.Context, queueName string, handler MessageHandler) erro
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("Failed to register a consumer: %w", err)
+		return fmt.Errorf("failed to register a consumer: %w", err)
 	}
 
 	log.Printf(" [*] Waiting for messages on %s", queueName)
